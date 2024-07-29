@@ -1,8 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Location from "expo-location";
-import { setUpScreenStyles as styles } from "./styles";
-
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -12,11 +10,17 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { getCurrentCoords } from "../utils/utils";
+import { useAppContext } from "./AppProvider";
+import { setUpScreenStyles as styles } from "./styles";
 
 function SetupScreen({ navigation }) {
-  const [inputDistance, setInputDistance] = useState("2");
+  const [inputDistance, setInputDistance] = useState("200");
   const [notificationTime, setNotificationTime] = useState(new Date());
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showDistanceTooltip, setShowDistanceTooltip] = useState(false);
+  const [showTimeTooltip, setShowTimeTooltip] = useState(false);
+  const { setOfficeLocation } = useAppContext();
 
   useEffect(() => {
     const requestPermissions = async () => {
@@ -31,16 +35,23 @@ function SetupScreen({ navigation }) {
 
   const setOfficeLocationHandler = async () => {
     try {
-      const currentLocation = await Location.getCurrentPositionAsync({});
+      const currentCoords = await getCurrentCoords();
       const officeLocation = {
-        latitude: currentLocation.coords.latitude,
-        longitude: currentLocation.coords.longitude,
+        latitude: currentCoords.latitude,
+        longitude: currentCoords.longitude,
       };
 
+      console.log(
+        "officeLocation from setupscreen handler: " +
+          JSON.stringify(officeLocation)
+      );
       await AsyncStorage.setItem(
         "officeLocation",
         JSON.stringify(officeLocation)
       );
+
+      setOfficeLocation(officeLocation);
+
       Alert.alert("Office location set!");
     } catch (error) {
       Alert.alert("Unable to get current location");
@@ -60,20 +71,19 @@ function SetupScreen({ navigation }) {
     Alert.alert("Allowed distance saved!");
   };
 
-  const saveNotificationTime = async () => {
-    const timeString = notificationTime.toTimeString().slice(0, 5);
-    await AsyncStorage.setItem("notificationTime", timeString);
-    Alert.alert("Notification time saved!");
-  };
-
   const navigateToHome = () => {
     navigation.navigate("Home");
   };
 
-  const handleTimeChange = (event, selectedTime) => {
+  const handleTimeChange = async (event, selectedTime) => {
     setShowTimePicker(Platform.OS === "ios");
     if (selectedTime) {
       setNotificationTime(selectedTime);
+
+      const timeString = selectedTime.toTimeString().slice(0, 5);
+      await AsyncStorage.setItem("notificationTime", timeString);
+
+      Alert.alert("Notification time saved!");
     }
   };
 
@@ -91,21 +101,34 @@ function SetupScreen({ navigation }) {
       </View>
 
       <View style={styles.section}>
-        <TextInput
-          style={styles.input}
-          placeholder="Allowed Distance (meters)"
-          keyboardType="numeric"
-          value={inputDistance}
-          onChangeText={setInputDistance}
-        />
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Allowed Distance (meters)"
+            keyboardType="numeric"
+            value={inputDistance}
+            onChangeText={setInputDistance}
+          />
+        </View>
+        {showDistanceTooltip && (
+          <Text style={styles.infoText}>
+            Range is the maximum distance from the office location within which
+            you can mark your attendance.
+          </Text>
+        )}
         <TouchableOpacity style={styles.button} onPress={saveAllowedDistance}>
           <Text style={styles.buttonText}>Save Range (in Meters)</Text>
+          <TouchableOpacity
+            style={styles.infoButton}
+            onPress={() => setShowDistanceTooltip(!showDistanceTooltip)}
+          >
+            <Text style={styles.infoButtonText}>ℹ️</Text>
+          </TouchableOpacity>
         </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
         <View style={styles.timePickerContainer}>
-          <Text style={styles.timePickerLabel}>Notification Time:</Text>
           <TouchableOpacity
             style={styles.timePickerButton}
             onPress={() => setShowTimePicker(true)}
@@ -113,7 +136,19 @@ function SetupScreen({ navigation }) {
             <Text style={styles.buttonText}>
               {notificationTime.toTimeString().slice(0, 5)}
             </Text>
+            <TouchableOpacity
+              style={styles.infoButton}
+              onPress={() => setShowTimeTooltip(!showTimeTooltip)}
+            >
+              <Text style={styles.infoButtonText}>ℹ️</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
+          {showTimeTooltip && (
+            <Text style={styles.infoText}>
+              You can set a time for a daily reminder. The app will send you a
+              notification at this time every day.
+            </Text>
+          )}
         </View>
 
         {showTimePicker && (
@@ -124,10 +159,6 @@ function SetupScreen({ navigation }) {
             onChange={handleTimeChange}
           />
         )}
-
-        <TouchableOpacity style={styles.button} onPress={saveNotificationTime}>
-          <Text style={styles.buttonText}>Save Notification Time</Text>
-        </TouchableOpacity>
       </View>
 
       <TouchableOpacity style={styles.homeButton} onPress={navigateToHome}>

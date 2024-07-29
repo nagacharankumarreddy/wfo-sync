@@ -111,17 +111,35 @@ export const setUpScreenStyles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 3,
-    alignItems: "center",
+    position: "relative",
+  },
+  inputContainer: {
+    width: "100%",
+    position: "relative",
   },
   input: {
-    width: "30%",
     height: 50,
     borderColor: "#ddd",
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 10,
-    marginBottom: 15,
     backgroundColor: "#f9f9f9",
+    textAlign: "center",
+  },
+  infoButton: {
+    position: "absolute",
+    right: 10,
+    top: 10,
+    zIndex: 1,
+  },
+  infoButtonText: {
+    fontSize: 24,
+    color: "#3498db",
+  },
+  infoText: {
+    fontSize: 14,
+    color: "#666",
+    marginTop: 10,
     textAlign: "center",
   },
   button: {
@@ -151,11 +169,6 @@ export const setUpScreenStyles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     marginBottom: 15,
-  },
-  timePickerLabel: {
-    fontSize: 16,
-    color: "#333",
-    marginBottom: 5,
   },
   timePickerButton: {
     width: "100%",

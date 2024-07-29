@@ -1,10 +1,17 @@
 import { FontAwesome } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
 import * as Location from "expo-location";
 import * as Notifications from "expo-notifications";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Alert, FlatList, Text, TouchableOpacity, View } from "react-native";
-import { formatDate, getDistanceFromLatLonInMeters } from "../utils/utils";
+import {
+  calculateDistance,
+  createAttendanceMessage,
+  formatDate,
+  getCurrentCoords,
+} from "../utils/utils";
+import { useAppContext } from "./AppProvider";
 import { homeScreenStyles as styles } from "./styles";
 
 Notifications.setNotificationHandler({
@@ -16,64 +23,61 @@ Notifications.setNotificationHandler({
 });
 
 function HomeScreen({ navigation }) {
-  const [officeLocation, setOfficeLocation] = useState(null);
+  const { officeLocation } = useAppContext();
+  console.log(
+    "office location homescreen top: " + JSON.stringify(officeLocation)
+  );
   const [attendanceHistory, setAttendanceHistory] = useState([]);
   const [allowedDistanceMeters, setAllowedDistanceMeters] = useState(2);
 
-  useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        const locationStatus =
-          await Location.requestForegroundPermissionsAsync();
-        if (locationStatus.status !== "granted") {
-          Alert.alert("Permission to access location was denied");
-          return;
-        }
+  useFocusEffect(
+    React.useCallback(() => {
+      const initializeApp = async () => {
+        try {
+          const locationStatus =
+            await Location.requestForegroundPermissionsAsync();
+          if (locationStatus.status !== "granted") {
+            Alert.alert("Permission to access location was denied");
+            return;
+          }
 
-        const notificationStatus =
-          await Notifications.requestPermissionsAsync();
-        if (notificationStatus.status !== "granted") {
-          Alert.alert("Permission to send notifications was denied");
-          return;
-        }
+          const notificationStatus =
+            await Notifications.requestPermissionsAsync();
+          if (notificationStatus.status !== "granted") {
+            Alert.alert("Permission to send notifications was denied");
+            return;
+          }
 
-        const storedOfficeLocation = await AsyncStorage.getItem(
-          "officeLocation"
-        );
-        if (storedOfficeLocation) {
-          setOfficeLocation(JSON.parse(storedOfficeLocation));
-        }
-
-        const storedDistance = await AsyncStorage.getItem(
-          "allowedDistanceMeters"
-        );
-        if (storedDistance) {
-          setAllowedDistanceMeters(Number(storedDistance));
-        }
-
-        loadAttendanceHistory();
-        scheduleDailyNotification();
-      } catch (error) {
-        console.error("Error initializing app:", error);
-      }
-    };
-
-    initializeApp();
-
-    const subscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        if (response.notification.request.content.data.screen) {
-          navigation.navigate(
-            response.notification.request.content.data.screen
+          const storedDistance = await AsyncStorage.getItem(
+            "allowedDistanceMeters"
           );
-        }
-      }
-    );
+          if (storedDistance) {
+            setAllowedDistanceMeters(Number(storedDistance));
+          }
 
-    return () => {
-      subscription.remove();
-    };
-  }, []);
+          loadAttendanceHistory();
+          scheduleDailyNotification();
+        } catch (error) {
+          console.error("Error initializing app:", error);
+        }
+      };
+
+      initializeApp();
+
+      const subscription =
+        Notifications.addNotificationResponseReceivedListener((response) => {
+          if (response.notification.request.content.data.screen) {
+            navigation.navigate(
+              response.notification.request.content.data.screen
+            );
+          }
+        });
+
+      return () => {
+        subscription.remove();
+      };
+    }, [officeLocation])
+  );
 
   const loadAttendanceHistory = async () => {
     try {
@@ -102,12 +106,11 @@ function HomeScreen({ navigation }) {
 
   const logAttendance = async () => {
     const today = new Date();
-    const dateString = formatDate(today);
     const dayString = today.toLocaleString("default", { weekday: "long" });
 
     const newEntry = {
       id: Date.now().toString(),
-      date: dateString,
+      date: formatDate(today),
       day: dayString,
     };
 
@@ -126,26 +129,19 @@ function HomeScreen({ navigation }) {
 
   const markAttendance = async () => {
     try {
-      const currentLocation = await Location.getCurrentPositionAsync({});
-      const currentCoords = currentLocation.coords;
+      const currentCoords = await getCurrentCoords();
       if (!currentCoords || !officeLocation) {
         Alert.alert("Office location not set");
         return;
       }
 
-      const distance = getDistanceFromLatLonInMeters(
-        currentCoords.latitude,
-        currentCoords.longitude,
-        officeLocation.latitude,
-        officeLocation.longitude
-      );
+      const distance = calculateDistance(currentCoords, officeLocation);
 
       const userInRange = distance <= allowedDistanceMeters;
       const today = new Date();
-      const dateString = formatDate(today);
       const isWeekend = today.getDay() === 0 || today.getDay() === 6;
       const existingEntry = attendanceHistory.find(
-        (item) => item.date === dateString
+        (item) => item.date === formatDate(today)
       );
 
       if (existingEntry) {
@@ -157,16 +153,12 @@ function HomeScreen({ navigation }) {
         await logAttendance();
         Alert.alert(
           "Attendance marked!",
-          `You are ${distance.toFixed(2)} meters from the office.`
+          `You are ${distance} meters from the office.`
         );
         return;
       }
 
-      const message = isWeekend
-        ? userInRange
-          ? "It's the weekend. Do you still want to proceed with marking attendance?"
-          : "It's the weekend and you are out of range. Do you still want to proceed with marking attendance?"
-        : `You are not within the allowed distance from the office location! Do you still want to proceed?`;
+      const message = createAttendanceMessage(isWeekend, userInRange, distance);
       Alert.alert("Attention", message, [
         { text: "Cancel", style: "cancel" },
         {
@@ -183,27 +175,29 @@ function HomeScreen({ navigation }) {
   };
 
   const scheduleDailyNotification = async () => {
-    await Notifications.cancelAllScheduledNotificationsAsync();
+    const timeString = await AsyncStorage.getItem("notificationTime");
+    if (!timeString) {
+      return;
+    }
 
-    const notificationTime = await AsyncStorage.getItem("notificationTime");
-    const hour = notificationTime
-      ? parseInt(notificationTime.split(":")[0])
-      : 11;
-    const minute = notificationTime
-      ? parseInt(notificationTime.split(":")[1])
-      : 45;
+    const [hours, minutes] = timeString.split(":").map(Number);
+    const trigger = new Date();
+    trigger.setHours(hours);
+    trigger.setMinutes(minutes);
+
+    if (trigger <= new Date()) {
+      trigger.setDate(trigger.getDate() + 1);
+    }
+
+    await Notifications.cancelAllScheduledNotificationsAsync();
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: "Daily Attendance Reminder",
-        body: "Don't forget to record your attendance today!",
+        title: "Mark Your Attendance!",
+        body: "Don't forget to log your attendance today.",
         data: { screen: "Home" },
       },
-      trigger: {
-        hour,
-        minute,
-        repeats: true,
-      },
+      trigger,
     });
   };
 

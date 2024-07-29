@@ -6,6 +6,7 @@ import { ActivityIndicator, Button, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { AppProvider } from "./components/AppProvider";
 import HomeScreen from "./components/HomeScreen";
 import SetupScreen from "./components/SetupScreen";
 
@@ -42,27 +43,29 @@ function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <NavigationContainer>
-          <Stack.Navigator initialRouteName={initialRoute}>
-            <Stack.Screen
-              name="Home"
-              component={HomeScreen}
-              options={({ navigation }) => ({
-                headerRight: () => (
-                  <Button
-                    onPress={() => navigation.navigate("Setup")}
-                    title="Setup"
-                  />
-                ),
-              })}
-            />
-            <Stack.Screen name="Setup" component={SetupScreen} />
-          </Stack.Navigator>
-        </NavigationContainer>
-      </GestureHandlerRootView>
-    </SafeAreaProvider>
+    <AppProvider>
+      <SafeAreaProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <NavigationContainer>
+            <Stack.Navigator initialRouteName={initialRoute}>
+              <Stack.Screen
+                name="Home"
+                component={HomeScreen}
+                options={({ navigation }) => ({
+                  headerRight: () => (
+                    <Button
+                      onPress={() => navigation.navigate("Setup")}
+                      title="Setup"
+                    />
+                  ),
+                })}
+              />
+              <Stack.Screen name="Setup" component={SetupScreen} />
+            </Stack.Navigator>
+          </NavigationContainer>
+        </GestureHandlerRootView>
+      </SafeAreaProvider>
+    </AppProvider>
   );
 }
 
