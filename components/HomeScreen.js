@@ -24,9 +24,6 @@ Notifications.setNotificationHandler({
 
 function HomeScreen({ navigation }) {
   const { officeLocation } = useAppContext();
-  console.log(
-    "office location homescreen top: " + JSON.stringify(officeLocation)
-  );
   const [attendanceHistory, setAttendanceHistory] = useState([]);
   const [allowedDistanceMeters, setAllowedDistanceMeters] = useState(2);
 

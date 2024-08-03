@@ -22,6 +22,27 @@ function SetupScreen({ navigation }) {
   const [showTimeTooltip, setShowTimeTooltip] = useState(false);
   const { setOfficeLocation } = useAppContext();
 
+  const loadStoredSettings = async () => {
+    try {
+      const storedDistance = await AsyncStorage.getItem(
+        "allowedDistanceMeters"
+      );
+      if (storedDistance) {
+        setInputDistance(storedDistance);
+      }
+
+      const storedTime = await AsyncStorage.getItem("notificationTime");
+      if (storedTime) {
+        const [hours, minutes] = storedTime.split(":").map(Number);
+        const newTime = new Date();
+        newTime.setHours(hours);
+        newTime.setMinutes(minutes);
+        setNotificationTime(newTime);
+      }
+    } catch (error) {
+      console.error("Error loading stored settings:", error);
+    }
+  };
   useEffect(() => {
     const requestPermissions = async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -31,6 +52,7 @@ function SetupScreen({ navigation }) {
     };
 
     requestPermissions();
+    loadStoredSettings();
   }, []);
 
   const setOfficeLocationHandler = async () => {

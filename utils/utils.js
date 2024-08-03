@@ -40,14 +40,14 @@ export const calculateDistance = (currentCoords, officeLocation) => {
 };
 
 export const createAttendanceMessage = (isWeekend, userInRange, distance) => {
-  const distanceMessage = `You are ${distance} meters away from the office.`;
+  const distanceMessage = `You are ${distance} meters away from the office`;
 
   if (isWeekend) {
     return userInRange
       ? `It's the weekend. Do you still want to proceed with marking attendance?`
       : `It's the weekend and ${distanceMessage}. Do you still want to proceed with marking attendance?`;
   } else {
-    return ` ${distanceMessage} Do you still want to proceed?`;
+    return ` ${distanceMessage}. Do you still want to proceed?`;
   }
 };
 
